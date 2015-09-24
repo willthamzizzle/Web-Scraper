@@ -6,14 +6,21 @@
 
 import scrapy
 
-class BlogSpider(scrapy.Spider):
-    name = 'blogspider'
-    start_urls = ['http://blog.scrapinghub.com']
+
+class StackOverflowSpider(scrapy.Spider):
+    name = 'stackoverflow'
+    start_urls = ['http://stackoverflow.com/questions?sort=votes']
 
     def parse(self, response):
-        for url in response.css('ul li a::attr("href")').re(r'.*/\d\d\d\d/\d\d/$'):
-            yield scrapy.Request(response.urljoin(url), self.parse_titles)
+        for href in response.css('.question-summary h3 a::attr(href)'):
+            full_url = response.urljoin(href.extract())
+            yield scrapy.Request(full_url, callback=self.parse_question)
 
-    def parse_titles(self, response):
-        for post_title in response.css('div.entries > ul > li a::text').extract():
-            yield {'title': post_title}
+    def parse_question(self, response):
+        yield {
+            'title': response.css('h1 a::text').extract()[0],
+            'votes': response.css('.question .vote-count-post::text').extract()[0],
+            'body': response.css('.question .post-text').extract()[0],
+            'tags': response.css('.question .post-tag::text').extract(),
+            'link': response.url,
+        }
